@@ -11,7 +11,7 @@
   - https://electronics.stackexchange.com/questions/116135/possible-to-re-program-microcontroller-over-bluetooth
 
   - custom bootloader to accept bin file using the same library used in updating the FPGA board. Ideally integrate this into the existing framework. Most work will be needed on the receiving end so that it can accept the new bin.  Checkout:
-  nRF5_SDK_15.0.0_a53641a \ dfu \ secure_bootloader \ pca10040_ble
+  nRF5_SDK_15.0.0_a53641a \ examples \ dfu \ secure_bootloader \ pca10040_ble
 
 
 ```c
