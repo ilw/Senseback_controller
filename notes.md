@@ -24,8 +24,74 @@
 #### ESB bootloader?
   http://infocenter.nordicsemi.com/index.jsp  
   Experimental ANT Bootloader/DFU requires S212 or S332  
+  https://devzone.nordicsemi.com/f/nordic-q-a/10460/installing-esb-when-using-bootloader  
+  https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk52.v0.9.2%2Fbledfu_bootloader_introduction.html
+#### Plan (read through bootloader code to check before testing)
+1. Change over the current UART communication for a serial interface before jumping into the rest of it. Might as well test everything using the correct interface.
+
+* Set up bootloader based off the example on the implant board  
+  * **bootloader.c** uses pstorage !fstorage throughout. Consider replacing the relevant function calls with equivalent fstorage code.  
+
+    ```C
+    static void bootloader_settings_save(bootloader_settings_t * p_settings)
+    {
+        uint32_t err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
+        APP_ERROR_CHECK(err_code);
+
+        err_code = pstorage_store(&m_bootsettings_handle,
+                                  (uint8_t *)p_settings,
+                                  sizeof(bootloader_settings_t),
+                                  0);
+        APP_ERROR_CHECK(err_code);
+    }
+    ```
+
+  * Will have to check trade offs for speed and file size and actual compatibility.
+
+* Set up a python/matlab interface for writing the new application image to the controller in flash memory. (possibly validate the image here but don't put it on the controller?)
+  * Not possible it seems with the given **bootloader.c** file (line 99). Seems to only validate as it updates the application. Either way this can be sent back as confirmation and then back to the user
+
+    ```C
+    bool bootloader_app_is_valid(uint32_t app_addr)
+    {
+        const bootloader_settings_t * p_bootloader_settings;
+
+        // There exists an application in CODE region 1.
+        if (*((uint32_t *)app_addr) == EMPTY_FLASH_MASK)
+        {
+            return false;
+        }
+
+        bool success = false;
+
+        bootloader_util_settings_get(&p_bootloader_settings);
+
+        // The application in CODE region 1 is flagged as valid during update.
+        if (p_bootloader_settings->bank_0 == BANK_VALID_APP)
+        {
+            uint16_t image_crc = 0;
+
+            // A stored crc value of 0 indicates that CRC checking is not used.
+            if (p_bootloader_settings->bank_0_crc != 0)
+            {
+                image_crc = crc16_compute((uint8_t *)DFU_BANK_0_REGION_START,
+                                          p_bootloader_settings->bank_0_size,
+                                          NULL);
+            }
+
+            success = (image_crc == p_bootloader_settings->bank_0_crc);
+        }
+
+        return success;
+    }
+    ```
+
+* Use ESB to send a command to the implant about receiving a new image. Adding tags for the fpga or the implant application.
+* Use bitbang/fstorage equivelant to send to *DfuTarg* address on the implant. The target address might change. May need calibration when setting up depending on the storage used by the bootloader/softdevice/FPGA image/application image in flash.
 
 
+#### pstorage -> fstorage conversion
+Not directly transferable... Will have to do some messing around possibly using the debugger to gather a more in depth understanding.
 
 ##### Working main.c controller code 4/5/2018
 ```C
