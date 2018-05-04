@@ -208,7 +208,7 @@ int main(void)
 			errcode = nrf_esb_write_payload(&dummy_payload); //Send reset payload to RX
 			while ((tx_fail_flag == 0) && (readpackets_flag == 0) && (tx_success_flag == 0)){
 
-				app_uart_put(0x12);
+				app_uart_put(0xFF);
 				nrf_delay_ms(2000);
 
 //				app_uart_put(0x3B);

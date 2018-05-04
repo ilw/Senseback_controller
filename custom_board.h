@@ -47,7 +47,11 @@ extern "C" {
 #define BSP_BUTTON_1   BUTTON_2
 
 
-
+#define RX_PIN_NUMBER  8
+#define TX_PIN_NUMBER  6
+#define CTS_PIN_NUMBER 7
+#define RTS_PIN_NUMBER 5
+//#define HWFC           true
 
 //#define SPIS_MISO_PIN   28  // SPI MISO signal.
 //#define SPIS_CSN_PIN    12  // SPI CSN signal.
