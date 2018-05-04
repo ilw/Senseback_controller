@@ -15,7 +15,7 @@
 #include "bsp.h"
 #include "boards.h"
 #include "nrf_log.h"
-#include "SEGGER_RTT.h"  
+#include "SEGGER_RTT.h"
 
 //Define UART buffer sizes
 #define UART_TX_BUF_SIZE 2048u      /**< UART TX buffer size. */
@@ -24,8 +24,8 @@
 //Declare ESB data variables
 static volatile bool esb_xfer_done;
 static unsigned char rx_msg;
-static unsigned char* uartrx;
-static unsigned int bytecount = 0;
+// static unsigned char* uartrx;
+// static unsigned int bytecount = 0;
 static uint32_t errcode, payload_w_ptr = 0;
 static volatile int rxpacketid = -5, uart_state = 0, tx_fail_count = 0;
 static volatile int tx_fail_flag = 0, tx_burst_flag = 0, tx_success_flag = 0, readpackets_flag = 0, uart_flag = 0;
@@ -33,10 +33,10 @@ nrf_esb_payload_t rx_payload;
 nrf_esb_payload_t tx_payload;
 nrf_esb_payload_t dummy_payload = NRF_ESB_CREATE_PAYLOAD(0, 0x61);
 nrf_esb_payload_t reset_payload = NRF_ESB_CREATE_PAYLOAD(0, 0x12, 0x35, 0x37);
-static char fail_string[17] = "Transfer Failed\r\n";
-static char success_string[21] = "Transfer Successful: ";
-static char received_string[19] = "Received Payload: ";
-static char newline_string[19] = "\r\n";
+// static char fail_string[17] = "Transfer Failed\r\n";
+// static char success_string[21] = "Transfer Successful: ";
+// static char received_string[19] = "Received Payload: ";
+// static char newline_string[19] = "\r\n";
 
 
 //Instantiate timer (for use during recording to repeatedly query the device)
@@ -59,19 +59,19 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 					if (nrf_esb_is_idle()) {
 						errcode = nrf_esb_write_payload(&dummy_payload);
 					}
-						
+
 					break;
         }
         default:
             //Do nothing.
             break;
-    }    
+    }
 }
 
 //ESB event handler - checking to see packet has been sent successfully
 void nrf_esb_event_handler(nrf_esb_evt_t const * p_event)
 {
-	int i;
+//	int i;
     switch (p_event->evt_id)
     {
 				case NRF_ESB_EVENT_RX_RECEIVED: {
@@ -90,7 +90,7 @@ void nrf_esb_event_handler(nrf_esb_evt_t const * p_event)
 				default: {
 					break;
 				}
-        
+
     }
 }
 
@@ -101,11 +101,11 @@ uint32_t esb_init( void )
     uint8_t base_addr_0[4] = {0xE7, 0xE7, 0xE7, 0xE7};
     uint8_t base_addr_1[4] = {0xC2, 0xC2, 0xC2, 0xC2};
     uint8_t addr_prefix[8] = {0xE7, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8 };
-		
+
 		//Configuration params
     nrf_esb_config_t nrf_esb_config         = NRF_ESB_DEFAULT_CONFIG;
 		nrf_esb_config.protocol                 = NRF_ESB_PROTOCOL_ESB_DPL;
-    nrf_esb_config.payload_length           = tx_payload.length; 
+    nrf_esb_config.payload_length           = tx_payload.length;
     nrf_esb_config.bitrate                  = NRF_ESB_BITRATE_2MBPS;
     nrf_esb_config.mode                     = NRF_ESB_MODE_PTX;			//TX mode
     nrf_esb_config.event_handler            = nrf_esb_event_handler;
@@ -155,21 +155,22 @@ void uart_event_handler(app_uart_evt_t * p_event)
 
 int main(void)
 {
-		uint32_t time_ms = 100; //Timer interval (query rate during recording)
-		uint32_t time_ticks;
-		int8_t tmp;
-		int i;
-		//Can use LED command to indicate state of device
-		LEDS_CONFIGURE(LEDS_MASK);
-    LEDS_OFF(LEDS_MASK);
-		uint32_t err_code;
-	
-		err_code = nrf_drv_timer_init(&TIMER_TX, NULL, timer_event_handler);
+	uint32_t time_ms = 100; //Timer interval (query rate during recording)
+	uint32_t time_ticks;
+	int8_t tmp;
+	int i;
+	//Can use LED command to indicate state of device
+  //note to add this changes to custom_board.h file need to be made, see config in pca10040.h for guidence
+	// LEDS_CONFIGURE(LEDS_MASK);
+	// LEDS_OFF(LEDS_MASK);
+	uint32_t err_code;
+
+	err_code = nrf_drv_timer_init(&TIMER_TX, NULL, timer_event_handler);
     APP_ERROR_CHECK(err_code);
     time_ticks = nrf_drv_timer_ms_to_ticks(&TIMER_TX, time_ms);
     nrf_drv_timer_extended_compare(&TIMER_TX, NRF_TIMER_CC_CHANNEL0, time_ticks, NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
-    
-		
+
+
 		//Initialize UART comms
 		const app_uart_comm_params_t comm_params =
       {
@@ -181,7 +182,7 @@ int main(void)
           false,
           UART_BAUDRATE_BAUDRATE_Baud1M
       };
-		
+
 		//Initialize UART FIFO
     APP_UART_FIFO_INIT(&comm_params,
                          UART_RX_BUF_SIZE,
@@ -197,7 +198,7 @@ int main(void)
 
     clocks_start();
     err_code = esb_init(); //Initialize radio
-    
+
 		for (i=0;i<252;i++) {
 			tx_payload.data[i] = 0;
 		}
@@ -205,7 +206,21 @@ int main(void)
 		rxpacketid = -5;
 		while (true) { //Verify connection loop
 			errcode = nrf_esb_write_payload(&dummy_payload); //Send reset payload to RX
-			while ((tx_fail_flag == 0) && (readpackets_flag == 0) && (tx_success_flag == 0)){};
+			while ((tx_fail_flag == 0) && (readpackets_flag == 0) && (tx_success_flag == 0)){
+
+				app_uart_put(0x12);
+				nrf_delay_ms(2000);
+
+//				app_uart_put(0x3B);
+//				nrf_delay_ms(2000);
+
+//				app_uart_put(0x00);
+//				nrf_delay_ms(2000);
+
+//				app_uart_put(0x7F);
+//				nrf_delay_ms(2000);
+			};
+
 			if (tx_fail_flag == 1) {
 				tx_success_flag = 0;
 				readpackets_flag = 0;
@@ -256,7 +271,7 @@ int main(void)
 				break;
 			}
 		}
-		
+
 		nrf_drv_timer_enable(&TIMER_TX); //Start automatic RX query/heartbeat monitor.
 		while ((tx_fail_flag == 0) && (readpackets_flag == 0)){};
 		if (tx_fail_flag == 1) {
@@ -284,14 +299,14 @@ int main(void)
 				nrf_drv_timer_disable(&TIMER_TX);
 				nrf_esb_flush_rx();
 			}
-			
+
 		}
 	}
-			
+
 	while (true) { //main loop
 		if (readpackets_flag == 1) {
 			while (nrf_esb_read_rx_payload(&rx_payload) == NRF_SUCCESS) {
-				
+
 				if (rx_payload.length >= 250) { //If payload max length seen more data may be available from PRX: immediately send dummy command to get more data
 					nrf_drv_timer_clear(&TIMER_TX);
 					errcode = nrf_esb_write_payload(&dummy_payload);
@@ -301,7 +316,7 @@ int main(void)
 					app_uart_put(0xBE);
 					app_uart_put(0xAD);
 				}
-				
+
 				if (((rxpacketid < 255) && ((int)rx_payload.data[0] != rxpacketid+1)) || ((rxpacketid == 255) && ((int)rx_payload.data[0] != 0))) {
 					tmp = (int8_t)(rxpacketid+1-(int)rx_payload.data[0]);
 					app_uart_put(0xBA);
@@ -383,7 +398,7 @@ int main(void)
 							payload_w_ptr = 0;
 							tx_payload.length = 0;
 							tx_payload.pid++;
-							
+
 						}
 						break;
 					}
