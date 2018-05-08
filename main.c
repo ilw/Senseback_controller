@@ -28,6 +28,13 @@
 #define UART_TX_BUF_SIZE 2048u      /**< UART TX buffer size. */
 #define UART_RX_BUF_SIZE 2048u         /**< UART RX buffer size. */
 
+//saadc variables
+#define SAMPLES_IN_BUFFER 5
+static const nrf_drv_timer_t   m_timer = NRF_DRV_TIMER_INSTANCE(1);
+static nrf_saadc_value_t       m_buffer_pool[2][SAMPLES_IN_BUFFER];
+static nrf_ppi_channel_t       m_ppi_channel;
+static uint32_t                m_adc_evt_counter;
+
 //Declare ESB data variables
 static volatile bool esb_xfer_done;
 static unsigned char rx_msg;
@@ -73,6 +80,10 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 					}
 
 					break;
+        }
+        case NRF_TIMER_EVENT_COMPARE1: {
+            //do nothing? TODO write handler
+            break;
         }
         default:
             //Do nothing.
@@ -190,8 +201,75 @@ void uart_config(void)
     //Initialize NRF_LOG (for debug messaging)
     err_code = NRF_LOG_INIT();
     APP_ERROR_CHECK(err_code);
-  }
+}
 
+void saadc_sampling_event_init(void)
+{
+    ret_code_t err_code;
+    err_code = nrf_drv_ppi_init();
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_timer_init(&m_timer, NULL, timer_event_handler);
+    APP_ERROR_CHECK(err_code);
+
+    /* setup m_timer for compare event every 400ms */
+    uint32_t ticks = nrf_drv_timer_ms_to_ticks(&m_timer, 400);
+    nrf_drv_timer_extended_compare(&m_timer, NRF_TIMER_CC_CHANNEL1, ticks, NRF_TIMER_SHORT_COMPARE1_CLEAR_MASK, false);
+    nrf_drv_timer_enable(&m_timer);
+
+    uint32_t timer_compare_event_addr = nrf_drv_timer_compare_event_address_get(&m_timer, NRF_TIMER_CC_CHANNEL1);
+    uint32_t saadc_sample_event_addr = nrf_drv_saadc_sample_task_get();
+
+    /* setup ppi channel so that timer compare event is triggering sample task in SAADC */
+    err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel, timer_compare_event_addr, saadc_sample_event_addr);
+    APP_ERROR_CHECK(err_code);
+}
+
+void saadc_sampling_event_enable(void)
+{
+    ret_code_t err_code = nrf_drv_ppi_channel_enable(m_ppi_channel);
+    APP_ERROR_CHECK(err_code);
+}
+
+void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
+{
+    if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
+    {
+        ret_code_t err_code;
+
+        err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, SAMPLES_IN_BUFFER);
+        APP_ERROR_CHECK(err_code);
+
+        int i;
+        printf("ADC event number: %d\r\n",(int)m_adc_evt_counter);
+        for (i = 0; i < SAMPLES_IN_BUFFER; i++)
+        {
+            printf("%d\r\n", p_event->data.done.p_buffer[i]);
+        }
+        m_adc_evt_counter++;
+    }
+}
+
+void saadc_init(void)
+{
+    ret_code_t err_code;
+    nrf_saadc_channel_config_t channel_config =
+            NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
+    err_code = nrf_drv_saadc_init(NULL, saadc_callback);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_saadc_channel_init(0, &channel_config);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[0],SAMPLES_IN_BUFFER);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[1],SAMPLES_IN_BUFFER);
+    APP_ERROR_CHECK(err_code);
+}
 
 int main(void)
 {
@@ -206,6 +284,10 @@ int main(void)
 	// LEDS_OFF(LEDS_MASK);
 	uint32_t err_code;
 
+  //initialise ppi
+  err_code = nrf_drv_ppi_init();
+  APP_ERROR_CHECK(err_code);
+
 	err_code = nrf_drv_timer_init(&TIMER_TX, NULL, timer_event_handler);
   APP_ERROR_CHECK(err_code);
   time_ticks = nrf_drv_timer_ms_to_ticks(&TIMER_TX, time_ms);
@@ -215,20 +297,18 @@ int main(void)
 
   clocks_start();
   err_code = esb_init(); //Initialize radio
-  //empty payload data registers
-  for (i=0; i<252; i++) { tx_payload.data[i] = 0; }
+
+  for (i=0; i<252; i++) { tx_payload.data[i] = 0; } //empty payload data registers
 
 	while (true) {
 		rxpacketid = -5;
 		while (true) { //Verify connection loop
 			errcode = nrf_esb_write_payload(&dummy_payload); //Send reset payload to RX
 			while ((tx_fail_flag == 0) && (readpackets_flag == 0) && (tx_success_flag == 0)){
-
+        //startup sequence, TODO remove later
 				app_uart_put(0xFA);
 				nrf_delay_ms(2000);
-
 			};
-
 			if (tx_fail_flag == 1) {
 				tx_success_flag = 0;
 				readpackets_flag = 0;
@@ -307,7 +387,6 @@ int main(void)
 				nrf_drv_timer_disable(&TIMER_TX);
 				nrf_esb_flush_rx();
 			}
-
 		}
 	}
 
