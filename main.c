@@ -16,7 +16,14 @@
 #include "boards.h"
 #include "nrf_log.h"
 #include "SEGGER_RTT.h"
+//---------------------------USB-----------------------------//
 
+#include <string.h>
+#include "nrf_drv_saadc.h"
+#include "nrf_drv_ppi.h"
+#include "app_util_platform.h"
+
+//-----------------------------------------------------------//
 //Define UART buffer sizes
 #define UART_TX_BUF_SIZE 2048u      /**< UART TX buffer size. */
 #define UART_RX_BUF_SIZE 2048u         /**< UART RX buffer size. */
@@ -51,6 +58,11 @@ void clocks_start( void )
     while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0);
 }
 
+
+
+
+
+//----------------------------------------------------------------//
 void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 {
     switch(event_type)
@@ -151,14 +163,43 @@ void uart_event_handler(app_uart_evt_t * p_event)
 	}
 }
 
+void uart_config(void)
+{
+  uint32_t err_code;
+  //Initialize UART comms
+  const app_uart_comm_params_t comm_params =
+  {
+    RX_PIN_NUMBER,
+    TX_PIN_NUMBER,
+    RTS_PIN_NUMBER,
+    CTS_PIN_NUMBER,
+    APP_UART_FLOW_CONTROL_DISABLED,
+    false,
+    UART_BAUDRATE_BAUDRATE_Baud1M
+  };
+
+  //Initialize UART FIFO
+  APP_UART_FIFO_INIT(&comm_params,
+    UART_RX_BUF_SIZE,
+    UART_TX_BUF_SIZE,
+    uart_event_handler,
+    APP_IRQ_PRIORITY_LOW,
+    err_code);
+    APP_ERROR_CHECK(err_code);
+
+    //Initialize NRF_LOG (for debug messaging)
+    err_code = NRF_LOG_INIT();
+    APP_ERROR_CHECK(err_code);
+  }
 
 
 int main(void)
 {
+  int i;                  //use this counter for all for loops
 	uint32_t time_ms = 100; //Timer interval (query rate during recording)
 	uint32_t time_ticks;
 	int8_t tmp;
-	int i;
+
 	//Can use LED command to indicate state of device
   //note to add this changes to custom_board.h file need to be made, see config in pca10040.h for guidence
 	// LEDS_CONFIGURE(LEDS_MASK);
@@ -166,59 +207,26 @@ int main(void)
 	uint32_t err_code;
 
 	err_code = nrf_drv_timer_init(&TIMER_TX, NULL, timer_event_handler);
-    APP_ERROR_CHECK(err_code);
-    time_ticks = nrf_drv_timer_ms_to_ticks(&TIMER_TX, time_ms);
-    nrf_drv_timer_extended_compare(&TIMER_TX, NRF_TIMER_CC_CHANNEL0, time_ticks, NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
+  APP_ERROR_CHECK(err_code);
+  time_ticks = nrf_drv_timer_ms_to_ticks(&TIMER_TX, time_ms);
+  nrf_drv_timer_extended_compare(&TIMER_TX, NRF_TIMER_CC_CHANNEL0, time_ticks, NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
 
+  uart_config();
 
-		//Initialize UART comms
-		const app_uart_comm_params_t comm_params =
-      {
-          RX_PIN_NUMBER,
-          TX_PIN_NUMBER,
-          RTS_PIN_NUMBER,
-          CTS_PIN_NUMBER,
-          APP_UART_FLOW_CONTROL_DISABLED,
-          false,
-          UART_BAUDRATE_BAUDRATE_Baud1M
-      };
+  clocks_start();
+  err_code = esb_init(); //Initialize radio
+  //empty payload data registers
+  for (i=0; i<252; i++) { tx_payload.data[i] = 0; }
 
-		//Initialize UART FIFO
-    APP_UART_FIFO_INIT(&comm_params,
-                         UART_RX_BUF_SIZE,
-                         UART_TX_BUF_SIZE,
-                         uart_event_handler,
-                         APP_IRQ_PRIORITY_LOW,
-                         err_code);
-    APP_ERROR_CHECK(err_code);
-
-		//Initialize NRF_LOG (for debug messaging)
-    err_code = NRF_LOG_INIT();
-    APP_ERROR_CHECK(err_code);
-
-    clocks_start();
-    err_code = esb_init(); //Initialize radio
-
-		for (i=0;i<252;i++) {
-			tx_payload.data[i] = 0;
-		}
 	while (true) {
 		rxpacketid = -5;
 		while (true) { //Verify connection loop
 			errcode = nrf_esb_write_payload(&dummy_payload); //Send reset payload to RX
 			while ((tx_fail_flag == 0) && (readpackets_flag == 0) && (tx_success_flag == 0)){
 
-				app_uart_put(0xFF);
+				app_uart_put(0xFA);
 				nrf_delay_ms(2000);
 
-//				app_uart_put(0x3B);
-//				nrf_delay_ms(2000);
-
-//				app_uart_put(0x00);
-//				nrf_delay_ms(2000);
-
-//				app_uart_put(0x7F);
-//				nrf_delay_ms(2000);
 			};
 
 			if (tx_fail_flag == 1) {

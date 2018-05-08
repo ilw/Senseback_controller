@@ -55,6 +55,9 @@ $(abspath ../../../../../components/properitary_rf/esb/nrf_esb.c) \
 $(abspath ../../../../../external/segger_rtt/RTT_Syscalls_KEIL.c) \
 $(abspath ../../../../../external/segger_rtt/SEGGER_RTT.c) \
 $(abspath ../../../../../external/segger_rtt/SEGGER_RTT_printf.c) \
+$(abspath ../../../../../components/drivers_nrf/hal/nrf_saadc.c) \
+$(abspath ../../../../../components/drivers_nrf/ppi/nrf_drv_ppi.c) \
+$(abspath ../../../../../components/drivers_nrf/saadc/nrf_drv_saadc.c) \
 
 #assembly files common to all targets
 ASM_SOURCE_FILES  += \
@@ -82,6 +85,10 @@ INC_PATHS += -I$(abspath ../../../../../components/drivers_nrf/timer)
 INC_PATHS += -I$(abspath ../../../../../components/libraries/timer)
 INC_PATHS += -I$(abspath ../../../../../components/drivers_nrf/spi_slave)
 INC_PATHS += -I$(abspath ../../../../../components/device)
+INC_PATHS += -I$(abspath ../../../../../components/drivers_nrf/ppi)
+INC_PATHS += -I$(abspath ../../../../../components/drivers_nrf/saadc)
+INC_PATHS += -I$(abspath ../../../../../components/toolchain/gcc)
+INC_PATHS += -I$(abspath ../../../../../examples/peripheral/saadc/config)
 
 OBJECT_DIRECTORY = _build
 LISTING_DIRECTORY = $(OBJECT_DIRECTORY)

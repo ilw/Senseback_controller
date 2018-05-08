@@ -9,7 +9,7 @@
  * the file.
  *
  */
- 
+
 #ifndef NRF_DRV_CONFIG_H
 #define NRF_DRV_CONFIG_H
 
@@ -66,7 +66,7 @@
 
 #define TIMER1_INSTANCE_INDEX      (TIMER0_ENABLED)
 #endif
- 
+
 #define TIMER2_ENABLED 0
 
 #if (TIMER2_ENABLED == 1)
@@ -385,7 +385,7 @@
 
 
 /* SAADC */
-#define SAADC_ENABLED 0
+#define SAADC_ENABLED 1 //changed
 
 #if (SAADC_ENABLED == 1)
 #define SAADC_CONFIG_RESOLUTION      NRF_SAADC_RESOLUTION_10BIT

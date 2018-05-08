@@ -28,6 +28,8 @@
   https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk52.v0.9.2%2Fbledfu_bootloader_introduction.html
 #### Plan (read through bootloader code to check before testing)
 1. Change over the current UART communication for a serial interface before jumping into the rest of it. Might as well test everything using the correct interface.
+  * https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk52.v0.9.2%2Fbledfu_bootloader_introduction.html  
+  * enabled SAADC in config/rx_pca10040/nrf_drv_config.h line 388
 
 * Set up bootloader based off the example on the implant board  
   * **bootloader.c** uses pstorage !fstorage throughout. Consider replacing the relevant function calls with equivalent fstorage code.  
