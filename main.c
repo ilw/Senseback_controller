@@ -16,24 +16,12 @@
 #include "boards.h"
 #include "nrf_log.h"
 #include "SEGGER_RTT.h"
-//---------------------------USB-----------------------------//
-
-#include <string.h>
-#include "nrf_drv_saadc.h"
-#include "nrf_drv_ppi.h"
-#include "app_util_platform.h"
-
-//-----------------------------------------------------------//
+//soft device API includes
+#include "nrf_nvic.h"
+// nrf_nvic_state_t nrf_nvic_state;
 //Define UART buffer sizes
 #define UART_TX_BUF_SIZE 2048u      /**< UART TX buffer size. */
 #define UART_RX_BUF_SIZE 2048u         /**< UART RX buffer size. */
-
-//saadc variables
-#define SAMPLES_IN_BUFFER 5
-static const nrf_drv_timer_t   m_timer = NRF_DRV_TIMER_INSTANCE(1);
-static nrf_saadc_value_t       m_buffer_pool[2][SAMPLES_IN_BUFFER];
-static nrf_ppi_channel_t       m_ppi_channel;
-static uint32_t                m_adc_evt_counter;
 
 //Declare ESB data variables
 static volatile bool esb_xfer_done;
@@ -47,6 +35,7 @@ nrf_esb_payload_t rx_payload;
 nrf_esb_payload_t tx_payload;
 nrf_esb_payload_t dummy_payload = NRF_ESB_CREATE_PAYLOAD(0, 0x61);
 nrf_esb_payload_t reset_payload = NRF_ESB_CREATE_PAYLOAD(0, 0x12, 0x35, 0x37);
+nrf_esb_payload_t bootloader_payload = NRF_ESB_CREATE_PAYLOAD(0, 0xFB, 0x55, 0xAA);
 // static char fail_string[17] = "Transfer Failed\r\n";
 // static char success_string[21] = "Transfer Successful: ";
 // static char received_string[19] = "Received Payload: ";
@@ -64,10 +53,6 @@ void clocks_start( void )
 
     while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0);
 }
-
-
-
-
 
 //----------------------------------------------------------------//
 void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
@@ -203,73 +188,6 @@ void uart_config(void)
     APP_ERROR_CHECK(err_code);
 }
 
-void saadc_sampling_event_init(void)
-{
-    ret_code_t err_code;
-    err_code = nrf_drv_ppi_init();
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_timer_init(&m_timer, NULL, timer_event_handler);
-    APP_ERROR_CHECK(err_code);
-
-    /* setup m_timer for compare event every 400ms */
-    uint32_t ticks = nrf_drv_timer_ms_to_ticks(&m_timer, 400);
-    nrf_drv_timer_extended_compare(&m_timer, NRF_TIMER_CC_CHANNEL1, ticks, NRF_TIMER_SHORT_COMPARE1_CLEAR_MASK, false);
-    nrf_drv_timer_enable(&m_timer);
-
-    uint32_t timer_compare_event_addr = nrf_drv_timer_compare_event_address_get(&m_timer, NRF_TIMER_CC_CHANNEL1);
-    uint32_t saadc_sample_event_addr = nrf_drv_saadc_sample_task_get();
-
-    /* setup ppi channel so that timer compare event is triggering sample task in SAADC */
-    err_code = nrf_drv_ppi_channel_alloc(&m_ppi_channel);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_ppi_channel_assign(m_ppi_channel, timer_compare_event_addr, saadc_sample_event_addr);
-    APP_ERROR_CHECK(err_code);
-}
-
-void saadc_sampling_event_enable(void)
-{
-    ret_code_t err_code = nrf_drv_ppi_channel_enable(m_ppi_channel);
-    APP_ERROR_CHECK(err_code);
-}
-
-void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
-{
-    if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
-    {
-        ret_code_t err_code;
-
-        err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, SAMPLES_IN_BUFFER);
-        APP_ERROR_CHECK(err_code);
-
-        int i;
-        printf("ADC event number: %d\r\n",(int)m_adc_evt_counter);
-        for (i = 0; i < SAMPLES_IN_BUFFER; i++)
-        {
-            printf("%d\r\n", p_event->data.done.p_buffer[i]);
-        }
-        m_adc_evt_counter++;
-    }
-}
-
-void saadc_init(void)
-{
-    ret_code_t err_code;
-    nrf_saadc_channel_config_t channel_config =
-            NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
-    err_code = nrf_drv_saadc_init(NULL, saadc_callback);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_saadc_channel_init(0, &channel_config);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[0],SAMPLES_IN_BUFFER);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_saadc_buffer_convert(m_buffer_pool[1],SAMPLES_IN_BUFFER);
-    APP_ERROR_CHECK(err_code);
-}
 
 int main(void)
 {
@@ -278,15 +196,11 @@ int main(void)
 	uint32_t time_ticks;
 	int8_t tmp;
 
+  uint32_t err_code;
 	//Can use LED command to indicate state of device
   //note to add this changes to custom_board.h file need to be made, see config in pca10040.h for guidence
 	// LEDS_CONFIGURE(LEDS_MASK);
 	// LEDS_OFF(LEDS_MASK);
-	uint32_t err_code;
-
-  //initialise ppi
-  err_code = nrf_drv_ppi_init();
-  APP_ERROR_CHECK(err_code);
 
 	err_code = nrf_drv_timer_init(&TIMER_TX, NULL, timer_event_handler);
   APP_ERROR_CHECK(err_code);
@@ -411,6 +325,17 @@ int main(void)
 					app_uart_put(0x00);
 					app_uart_put(tmp);
 				}
+        if (rx_payload.length == 3 && rx_payload.data[1] == 0xFB && rx_payload.data[2] == 0x55){ //ACK that bootloader cmd is sent and received
+
+          app_uart_put(0xFB);
+          app_uart_put(0x55);
+          app_uart_put(0xCC);
+          readpackets_flag = 0;
+          rxpacketid = rx_payload.data[0];
+          break;                          //eunning order continues to enter the else statement dispite completing the if, so a break was needed. TODO fix this properly
+          
+          //put handler fuction here
+        }
 				rxpacketid = rx_payload.data[0];
 				if (rx_payload.length == 3 && rx_payload.data[1] == 0xF1 && rx_payload.data[2] == 0xF0) {
 					//If receiving FIFO_EMPTY payload from RX, do not print to UART (do nothing)
@@ -444,10 +369,12 @@ int main(void)
 					case 0: {
 						switch (rx_msg) {
 							case 0x17: { //Command: start heartbeat timer for RX monitoring
+                app_uart_put(0xAB);
 								nrf_drv_timer_enable(&TIMER_TX);
 								break;
 							}
 							case 0x23: { //Command: stop heartbeat timer for RX monitoring
+                app_uart_put(0xAC);
 								nrf_drv_timer_disable(&TIMER_TX);
 								break;
 							}
@@ -463,6 +390,15 @@ int main(void)
 								errcode = nrf_esb_flush_tx();
 								break;
 							}
+              case 0x20: { //system reset
+                // errcode = sd_nvic_SystemReset();
+                NVIC_SystemReset();
+                break;
+              }
+              case 0x42: { //start bootloader
+                errcode = nrf_esb_write_payload(&bootloader_payload);
+                break;
+              }
 							default: {
 								break;
 							}
@@ -485,7 +421,6 @@ int main(void)
 							payload_w_ptr = 0;
 							tx_payload.length = 0;
 							tx_payload.pid++;
-
 						}
 						break;
 					}

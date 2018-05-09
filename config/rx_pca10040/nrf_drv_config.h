@@ -56,7 +56,7 @@
 #define TIMER0_INSTANCE_INDEX      0
 #endif
 
-#define TIMER1_ENABLED 1
+#define TIMER1_ENABLED 0
 
 #if (TIMER1_ENABLED == 1)
 #define TIMER1_CONFIG_FREQUENCY    NRF_TIMER_FREQ_16MHz
@@ -385,7 +385,7 @@
 
 
 /* SAADC */
-#define SAADC_ENABLED 1 //changed
+#define SAADC_ENABLED 0 //changed
 
 #if (SAADC_ENABLED == 1)
 #define SAADC_CONFIG_RESOLUTION      NRF_SAADC_RESOLUTION_10BIT
