@@ -35,7 +35,7 @@ nrf_esb_payload_t rx_payload;
 nrf_esb_payload_t tx_payload;
 nrf_esb_payload_t dummy_payload = NRF_ESB_CREATE_PAYLOAD(0, 0x61);
 nrf_esb_payload_t reset_payload = NRF_ESB_CREATE_PAYLOAD(0, 0x12, 0x35, 0x37);
-nrf_esb_payload_t bootloader_payload = NRF_ESB_CREATE_PAYLOAD(0, 0xFB, 0x55, 0xAA);
+nrf_esb_payload_t bootloader_payload = NRF_ESB_CREATE_PAYLOAD(0, 0xFB, 0x55, 0xAA, 0, 0x00, 0x00, 0x00);
 // static char fail_string[17] = "Transfer Failed\r\n";
 // static char success_string[21] = "Transfer Successful: ";
 // static char received_string[19] = "Received Payload: ";
@@ -63,11 +63,10 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 					if (nrf_esb_is_idle()) {
 						errcode = nrf_esb_write_payload(&dummy_payload);
 					}
-
 					break;
         }
         case NRF_TIMER_EVENT_COMPARE1: {
-            //do nothing? TODO write handler
+            //TODO use or remove this
             break;
         }
         default:
@@ -79,7 +78,6 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 //ESB event handler - checking to see packet has been sent successfully
 void nrf_esb_event_handler(nrf_esb_evt_t const * p_event)
 {
-//	int i;
     switch (p_event->evt_id)
     {
 				case NRF_ESB_EVENT_RX_RECEIVED: {
@@ -173,7 +171,6 @@ void uart_config(void)
     false,
     UART_BAUDRATE_BAUDRATE_Baud1M
   };
-
   //Initialize UART FIFO
   APP_UART_FIFO_INIT(&comm_params,
     UART_RX_BUF_SIZE,
@@ -191,7 +188,7 @@ void uart_config(void)
 
 int main(void)
 {
-  int i;                  //use this counter for all for loops
+  int i;                  //use this counter in all for loops
 	uint32_t time_ms = 100; //Timer interval (query rate during recording)
 	uint32_t time_ticks;
 	int8_t tmp;
@@ -214,6 +211,7 @@ int main(void)
 
   for (i=0; i<252; i++) { tx_payload.data[i] = 0; } //empty payload data registers
 
+  //start up sequence
 	while (true) {
 		rxpacketid = -5;
 		while (true) { //Verify connection loop
@@ -325,16 +323,30 @@ int main(void)
 					app_uart_put(0x00);
 					app_uart_put(tmp);
 				}
-        if (rx_payload.length == 3 && rx_payload.data[1] == 0xFB && rx_payload.data[2] == 0x55){ //ACK that bootloader cmd is sent and received
+        if (rx_payload.length == 6 && rx_payload.data[1] == 0xDB){ //ACK that debug line is reached
 
+          app_uart_put(rx_payload.data[0]);
+          app_uart_put(rx_payload.data[1]);
+          app_uart_put(rx_payload.data[2]);
+          app_uart_put(rx_payload.data[3]);
+          app_uart_put(rx_payload.data[4]);
+          app_uart_put(rx_payload.data[5]);
+          readpackets_flag = 0;
+          rxpacketid = rx_payload.data[0];
+          break;
+        }
+        if (rx_payload.length == 3 && rx_payload.data[1] == 0xFB && rx_payload.data[2] == 0x55){ //ACK that bootloader cmd is sent and received
           app_uart_put(0xFB);
           app_uart_put(0x55);
           app_uart_put(0xCC);
           readpackets_flag = 0;
           rxpacketid = rx_payload.data[0];
-          break;                          //eunning order continues to enter the else statement dispite completing the if, so a break was needed. TODO fix this properly
-          
+
           //put handler fuction here
+
+
+          break;
+
         }
 				rxpacketid = rx_payload.data[0];
 				if (rx_payload.length == 3 && rx_payload.data[1] == 0xF1 && rx_payload.data[2] == 0xF0) {
@@ -391,12 +403,24 @@ int main(void)
 								break;
 							}
               case 0x20: { //system reset
+                errcode = nrf_esb_write_payload(&reset_payload);
+                nrf_delay_ms(500);
                 // errcode = sd_nvic_SystemReset();
                 NVIC_SystemReset();
                 break;
               }
               case 0x42: { //start bootloader
+                // Send B and 3 figure file size e.g 3 -> 003, 240 -> 240, 20 -> 020 etc
+                app_uart_get(&rx_msg);
+                bootloader_payload.data[5] = rx_msg & 0xF;
+                app_uart_get(&rx_msg);
+                bootloader_payload.data[6] = rx_msg & 0xF;
+                app_uart_get(&rx_msg);
+                bootloader_payload.data[7] = rx_msg & 0xF;
+
+
                 errcode = nrf_esb_write_payload(&bootloader_payload);
+
                 break;
               }
 							default: {
