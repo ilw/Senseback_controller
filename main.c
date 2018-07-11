@@ -410,7 +410,7 @@ int main(void)
                 break;
               }
               case 0x42: { //start bootloader
-                // Send B and 3 figure file size e.g 3 -> 003, 240 -> 240, 20 -> 020 etc
+                // Send B and 3 figure file size e.g 3KB -> 003, 240KB -> 240, 20KB -> 020 etc
                 app_uart_get(&rx_msg);
                 bootloader_payload.data[5] = rx_msg & 0xF;
                 app_uart_get(&rx_msg);
