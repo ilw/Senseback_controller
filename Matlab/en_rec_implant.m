@@ -34,9 +34,5 @@ invoke(handles.hrealterm, 'putchar', uint8(0));
 invoke(handles.hrealterm, 'putchar', uint8(0));
 
 
-
-
-
-
 end
 
