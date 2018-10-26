@@ -241,13 +241,13 @@ int main(void)
 			nrf_delay_ms(1000);
 			rxpacketid = -5;
 			tx_fail_count=0;
-			errcode = nrf_esb_write_payload(&dummy_payload); //Send reset payload to RX
+			errcode = nrf_esb_write_payload(&dummy_payload); //Send dummy payload to RX
 			power_manage(); //Waits for an event - i.e a flag being set.
 
 			if (!tx_success_flag)
 			{
 				LEDS_OFF(LEDS_MASK);
-				uart_send("\xB0\x07\x01");
+				uart_send("\xB0\x07\x01"); //Only prints if DEBUG defined
 				nrf_delay_ms(1000);
 				tx_fail_flag =0;
 				break;
@@ -255,7 +255,7 @@ int main(void)
 
 
 			nrf_esb_flush_rx();
-			uart_send("\xB0\x07\x02");
+			uart_send("\xB0\x07\x02"); //Only prints if DEBUG defined
 			reset_flags();
 			link_state = RESETTING;
 			nrf_delay_ms(1000);
@@ -268,7 +268,7 @@ int main(void)
 			if (tx_fail_flag)
 			{
 				reset_flags();
-				uart_send("\xB0\x07\x03");
+				uart_send("\xB0\x07\x03"); //Only prints if DEBUG defined
 				nrf_delay_ms(500);
 				LEDS_ON(BSP_LED_0_MASK);
 				if (tx_fail_count > 10) link_state = DISCONNECTED;
@@ -279,7 +279,7 @@ int main(void)
 			nrf_esb_flush_rx();
 			nrf_esb_flush_tx();
 			reset_flags();
-			uart_send("\xB0\x07\x04");
+			uart_send("\xB0\x07\x04"); //Only prints if DEBUG defined
 			rxpacketid = -1;
 			link_state = HEARTBEAT_CHECK;
 			nrf_delay_ms(6000);
@@ -291,7 +291,7 @@ int main(void)
 			if (tx_fail_flag || !readpackets_flag)
 			{
 				LEDS_ON(BSP_LED_0_MASK | BSP_LED_1_MASK);
-				uart_send("\xB0\x07\x05");
+				uart_send("\xB0\x07\x05"); //Only prints if DEBUG defined
 				nrf_drv_timer_disable(&TIMER_TX);
 				if (tx_fail_count > 10) link_state= RESETTING;
 				reset_flags();
@@ -304,7 +304,7 @@ int main(void)
 			err_code = nrf_esb_read_rx_payload(&rx_payload);
 			if (rx_payload.data[0] || err_code)
 			{
-				uart_send("\xB0\x07\x06");
+				uart_send("\xB0\x07\x06"); //Only prints if DEBUG defined
 				//app_uart_put(rx_payload.data[0]);
 				nrf_drv_timer_disable(&TIMER_TX);
 				link_state= RESETTING; //Need to reset the rx chip because link is ok, but chip state isn't
@@ -329,12 +329,12 @@ int main(void)
 						nrf_drv_timer_clear(&TIMER_TX);
 						errcode = nrf_esb_write_payload(&dummy_payload);
 						tx_payload.pid++;
-						uart_send("\xFE\xED\xBE\xAD");
+						uart_send("\xFE\xED\xBE\xAD"); //Only prints if DEBUG defined
 					}
 
 					if (((rxpacketid < 255) && ((int)rx_payload.data[0] != rxpacketid+1)) || ((rxpacketid == 255) && ((int)rx_payload.data[0] != 0))) {
 						tmp = (int8_t)(rxpacketid+1-(int)rx_payload.data[0]);
-						uart_send("\xBA\xDD\xF0\x0D");
+						uart_send("\xBA\xDD\xF0\x0D"); //Only prints if DEBUG defined
 #ifdef DEBUG
 						app_uart_put(tmp);
 #endif
@@ -345,11 +345,11 @@ int main(void)
 						//app_uart_put(0xFF);
 					}
 					else {
-						uart_send("\xDA\x7A");
+						uart_send("\xDA\x7A"); //Only prints if DEBUG defined
 #ifdef DEBUG
 						app_uart_put(rx_payload.length);
 #endif
-						for (i=0;i<rx_payload.length;i++) {app_uart_put(rx_payload.data[i]);}
+						for (i=1;i<rx_payload.length;i++) {app_uart_put(rx_payload.data[i]);}
 						//for (i=0;i<2;i++)	{app_uart_put(newline_string[i]);}
 					}
 				}
@@ -359,7 +359,7 @@ int main(void)
 			if (tx_fail_flag == 1) {
 				LEDS_OFF(LEDS_MASK);
 				//nrf_drv_timer_disable(&TIMER_TX);
-				uart_send("\xDE\xAD\xBE\xEF");
+				uart_send("\xDE\xAD\xBE\xEF"); //Only prints if DEBUG defined
 				if (tx_fail_count >= 15)
 				{
 					nrf_esb_flush_rx();
@@ -412,7 +412,9 @@ int main(void)
 								uart_state = 0;
 								nrf_drv_timer_clear(&TIMER_TX);
 								nrf_esb_write_payload(&tx_payload);
-								app_uart_put((uint8_t)payload_w_ptr); //Do i need to comment this out
+#ifdef DEBUG
+								app_uart_put((uint8_t)payload_w_ptr);
+#endif
 								payload_w_ptr = 0;
 								tx_payload.length = 0;
 								tx_payload.pid++;
