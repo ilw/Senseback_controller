@@ -1,1 +1,6 @@
 pca10040/arm5_no_packs/_build/
+*.o
+_build/nrf52832_xxaa.bin
+_build/nrf52832_xxaa.hex
+_build/nrf52832_xxaa.map
+_build/nrf52832_xxaa.out
